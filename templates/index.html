@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube Downloader</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="sidebar">
+        <div class="logo">YT</div>
+        <div class="menu-item"><i class="icon-home"></i></div>
+        <div class="menu-item"><i class="icon-download"></i></div>
+        <div class="menu-item"><i class="icon-history"></i></div>
+        <div class="menu-item"><i class="icon-settings"></i></div>
+    </div>
+    <div class="main-content">
+        <header>
+            <h1>Good Evening, User</h1>
+            <div class="user-profile">
+                <img src="https://via.placeholder.com/40" alt="User">
+            </div>
+        </header>
+        <div class="content">
+            <div class="card video-preview">
+                <h2>Video Preview</h2>
+                <img id="thumbnail" src="https://via.placeholder.com/300x150" alt="Video Thumbnail">
+                <p id="videoTitle">Enter a URL to see the video preview</p>
+            </div>
+            <div class="card downloader-controls">
+                <h2>Download Options</h2>
+                <input type="text" id="videoUrl" placeholder="Enter YouTube URL" oninput="updateThumbnail()">
+                <div class="download-type">
+                    <label><input type="radio" name="downloadType" value="video" checked> Video</label>
+                    <label><input type="radio" name="downloadType" value="mp3"> MP3</label>
+                </div>
+                <select id="resolution">
+                    <option value="best">Best Available (up to 4K)</option>
+                    <option value="2160">4K (2160p)</option>
+                    <option value="1440">2K (1440p)</option>
+                    <option value="1080">1080p</option>
+                    <option value="720">720p</option>
+                    <option value="480">480p</option>
+                    <option value="360">360p</option>
+                    <option value="144">144p</option>
+                </select>
+                <label><input type="checkbox" id="highBitrateAudio"> High Bitrate Audio</label>
+                <button onclick="downloadVideo()">Download</button>
+                <div id="progress" class="progress-bar" style="display:none;">
+                    <div id="progressFill" class="progress-fill"></div>
+                </div>
+                <p id="status"></p>
+                <a id="downloadLink" style="display:none;" download>Click here to download your file</a>
+            </div>
+            <div class="card stats">
+                <h2>Your Stats</h2>
+                <p>Total Downloads: <span id="totalDownloads">0</span></p>
+                <p>Total Size: <span id="totalSize">0 MB</span></p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let downloadCount = 0;
+        let totalSize = 0;
+
+        async function updateThumbnail() {
+            const url = document.getElementById('videoUrl').value;
+            const thumbnail = document.getElementById('thumbnail');
+            const videoTitle = document.getElementById('videoTitle');
+
+            if (url.includes('youtu.be') || url.includes('youtube.com')) {
+                const videoId = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|v\/))([^&?]+)/)?.[1];
+                if (videoId) {
+                    thumbnail.src = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+                    // Fetch title (simplified, ideally use YouTube API)
+                    videoTitle.textContent = "Loading title...";
+                    try {
+                        const response = await fetch(`/get_title?url=${encodeURIComponent(url)}`);
+                        const data = await response.json();
+                        videoTitle.textContent = data.title || "Unknown Title";
+                    } catch {
+                        videoTitle.textContent = "Unable to fetch title";
+                    }
+                }
+            } else {
+                thumbnail.src = "https://via.placeholder.com/300x150";
+                videoTitle.textContent = "Enter a valid YouTube URL";
+            }
+        }
+
+        async function downloadVideo() {
+            const url = document.getElementById('videoUrl').value;
+            const downloadType = document.querySelector('input[name="downloadType"]:checked').value;
+            const resolution = document.getElementById('resolution').value;
+            const highBitrateAudio = document.getElementById('highBitrateAudio').checked;
+            const status = document.getElementById('status');
+            const downloadLink = document.getElementById('downloadLink');
+            const progress = document.getElementById('progress');
+            const progressFill = document.getElementById('progressFill');
+
+            if (!url) {
+                status.textContent = "Please enter a valid YouTube URL!";
+                return;
+            }
+
+            status.textContent = "Downloading... Please wait.";
+            progress.style.display = "block";
+            progressFill.style.width = "0%";
+            downloadLink.style.display = "none";
+
+            try {
+                const response = await fetch('/download', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        url: url, 
+                        download_type: downloadType,
+                        resolution: resolution, 
+                        high_bitrate_audio: highBitrateAudio 
+                    })
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    progressFill.style.width = "100%";
+                    status.textContent = "Download complete!";
+                    downloadLink.href = result.file_url;
+                    downloadLink.style.display = "block";
+                    // Update stats (simplified)
+                    downloadCount++;
+                    totalSize += 100; // Placeholder size in MB
+                    document.getElementById('totalDownloads').textContent = downloadCount;
+                    document.getElementById('totalSize').textContent = totalSize + " MB";
+                } else {
+                    status.textContent = `Error: ${result.error}`;
+                    progress.style.display = "none";
+                }
+            } catch (error) {
+                status.textContent = "An error occurred. Please try again.";
+                progress.style.display = "none";
+                console.error(error);
+            }
+        }
+
+        // Disable resolution dropdown when MP3 is selected
+        document.querySelectorAll('input[name="downloadType"]').forEach(radio => {
+            radio.addEventListener('change', function() {
+                const resolutionSelect = document.getElementById('resolution');
+                resolutionSelect.disabled = this.value === 'mp3';
+            });
+        });
+    </script>
+</body>
+</html>
