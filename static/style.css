@@ -26,6 +26,7 @@ body {
     margin: 20px 0;
     color: #888;
     font-size: 20px;
+    transition: color 0.3s ease; /* Added for smoother hover effect */
 }
 
 .menu-item:hover {
@@ -67,6 +68,7 @@ header h1 {
     padding: 20px;
     flex: 1;
     min-width: 300px;
+    max-width: 400px; /* Added to prevent cards from stretching too wide */
     box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
 }
 
@@ -90,6 +92,12 @@ input[type="text"], select {
     border-radius: 5px;
     background-color: #3a3a3a;
     color: #fff;
+    transition: background-color 0.3s ease; /* Added for focus effect */
+}
+
+input[type="text"]:focus, select:focus {
+    background-color: #4a4a4a; /* Slightly lighter background on focus */
+    outline: none;
 }
 
 .download-type {
@@ -111,10 +119,16 @@ button {
     border-radius: 5px;
     cursor: pointer;
     margin: 10px 0;
+    transition: background-color 0.3s ease; /* Added for smoother hover effect */
 }
 
 button:hover {
     background-color: #e04343;
+}
+
+button:focus {
+    outline: none;
+    background-color: #e04343; /* Same as hover for focus state */
 }
 
 .progress-bar {
@@ -157,4 +171,14 @@ button:hover {
 .stats span {
     color: #ff4d4d;
     font-weight: bold;
+}
+
+.disclaimer {
+    margin-top: 20px;
+    padding: 10px;
+    background-color: #3a3a3a;
+    border-radius: 5px;
+    font-size: 12px;
+    color: #ccc;
+    text-align: center;
 }

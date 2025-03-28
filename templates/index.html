@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>YouTube Downloader</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
 </head>
 <body>
     <div class="sidebar">
@@ -51,6 +52,9 @@
                 </div>
                 <p id="status"></p>
                 <a id="downloadLink" style="display:none;" download>Click here to download your file</a>
+                <div class="disclaimer">
+                    <p>Disclaimer: This tool is for personal use only. Ensure you have permission to download content. We are not responsible for violations of YouTube's Terms of Service or copyright laws.</p>
+                </div>
             </div>
             <div class="card stats">
                 <h2>Your Stats</h2>
@@ -78,7 +82,11 @@
                     try {
                         const response = await fetch(`/get_title?url=${encodeURIComponent(url)}`);
                         const data = await response.json();
-                        videoTitle.textContent = data.title || "Unknown Title";
+                        if (data.error) {
+                            videoTitle.textContent = data.error;
+                        } else {
+                            videoTitle.textContent = data.title || "Unknown Title";
+                        }
                     } catch {
                         videoTitle.textContent = "Unable to fetch title";
                     }
