@@ -1,11 +1,12 @@
 from flask import Flask, request, jsonify, send_from_directory, render_template
 import yt_dlp
 import os
+import tempfile
 
 app = Flask(__name__)
 
-# Directory to save downloaded files
-DOWNLOAD_FOLDER = "downloads"
+# Use /tmp for downloads on Render (or local temp directory if not set)
+DOWNLOAD_FOLDER = os.getenv('DOWNLOAD_FOLDER', os.path.join(tempfile.gettempdir(), 'downloads'))
 if not os.path.exists(DOWNLOAD_FOLDER):
     os.makedirs(DOWNLOAD_FOLDER)
 
@@ -41,13 +42,30 @@ def get_title():
     if not video_url:
         return jsonify({'error': 'No URL provided'}), 400
 
-    ydl_opts = {'skip_download': True}
+    # Configure yt-dlp with options to bypass restrictions
+    ydl_opts = {
+        'skip_download': True,
+        'quiet': True,
+        'no_warnings': True,
+        'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        'extractor_args': {
+            'youtube': {
+                'player_client': 'web',  # Use web client to avoid bot detection
+            }
+        }
+    }
+
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(video_url, download=False)
             return jsonify({'title': info.get('title', 'Unknown Title')})
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        error_msg = str(e)
+        if "Sign in to confirm you’re not a bot" in error_msg:
+            return jsonify({'error': 'YouTube is blocking this request due to bot detection. Please try again later or use a different video.'}), 403
+        elif "HTTP Error 429" in error_msg:
+            return jsonify({'error': 'Too many requests to YouTube. Please wait a while and try again.'}), 429
+        return jsonify({'error': f'Failed to fetch video title: {error_msg}'}), 500
 
 @app.route('/download', methods=['POST'])
 def download():
@@ -60,9 +78,16 @@ def download():
     if not video_url:
         return jsonify({'error': 'No URL provided'}), 400
 
+    # Configure yt-dlp with options to bypass restrictions
     ydl_opts = {
         'format': get_format(download_type, resolution, high_bitrate_audio),
         'outtmpl': os.path.join(DOWNLOAD_FOLDER, '%(title)s.%(ext)s'),
+        'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        'extractor_args': {
+            'youtube': {
+                'player_client': 'web',  # Use web client to avoid bot detection
+            }
+        }
     }
 
     if download_type == 'mp3':
@@ -89,7 +114,12 @@ def download():
             file_url = f"/downloads/{os.path.basename(filename)}"
             return jsonify({'file_url': file_url})
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        error_msg = str(e)
+        if "Sign in to confirm you’re not a bot" in error_msg:
+            return jsonify({'error': 'YouTube is blocking this request due to bot detection. Please try again later or use a different video.'}), 403
+        elif "HTTP Error 429" in error_msg:
+            return jsonify({'error': 'Too many requests to YouTube. Please wait a while and try again.'}), 429
+        return jsonify({'error': f'Failed to download video: {error_msg}'}), 500
 
 @app.route('/downloads/<filename>')
 def serve_file(filename):
@@ -97,6 +127,11 @@ def serve_file(filename):
         return send_from_directory(DOWNLOAD_FOLDER, filename, as_attachment=True)
     except FileNotFoundError:
         return jsonify({'error': 'File not found'}), 404
+    finally:
+        # Clean up the file after serving to save space
+        file_path = os.path.join(DOWNLOAD_FOLDER, filename)
+        if os.path.exists(file_path):
+            os.remove(file_path)
 
 if __name__ == '__main__':
     app.run(debug=True)
